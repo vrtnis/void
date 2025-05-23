@@ -1,0 +1,33 @@
+name: Windows ARM64 Build
+
+on:
+  workflow_dispatch:  # Enables manual trigger from GitHub UI
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run gulp build for win32-arm64
+        run: npm run gulp vscode-win32-arm64
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v3
+        with:
+          name: void-win32-arm64
+          path: |
+            .build/
+            out/
+            out-build/
+            VSCode-win32-arm64/
