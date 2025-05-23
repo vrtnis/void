@@ -30,7 +30,7 @@ jobs:
 
       - name: Zip build output
         run: |
-          powershell -Command "Compress-Archive -Path VSCode-win32-arm64\* -DestinationPath void-win32-arm64.zip"
+          powershell -Command "Compress-Archive -Path .build\* -DestinationPath void-win32-arm64.zip"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -38,7 +38,4 @@ jobs:
           name: void-win32-arm64
           path: |
             .build/
-            out/
-            out-build/
-            VSCode-win32-arm64/
             void-win32-arm64.zip
