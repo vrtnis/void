@@ -1,4 +1,4 @@
-name: Windows ARM64 Build
+name: Windows ARM64 Build (Fast, No Minification)
 
 on:
   workflow_dispatch:
@@ -28,17 +28,14 @@ jobs:
       - name: Run gulp for Windows ARM64
         run: npm run gulp vscode-win32-arm64
 
-      - name: Package for Windows ARM64 (generates .exe)
-        run: npm run gulp vscode-win32-arm64-min
-
-      - name: Zip packaged output
+      - name: Zip .build/ output
         run: |
-          powershell -Command "Compress-Archive -Path ../VSCode-win32-arm64\* -DestinationPath void-win32-arm64.zip"
+          powershell -Command "Compress-Archive -Path .build\* -DestinationPath void-win32-arm64.zip"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: void-win32-arm64
           path: |
-            ../VSCode-win32-arm64/
+            .build/
             void-win32-arm64.zip
