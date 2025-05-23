@@ -597,6 +597,14 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			// Apply some state after window creation
 			this.applyState(this.windowState, hasMultipleDisplays);
 
+			/* ─────────────  native 1-px resize to unblock compositor  ───────────── */
+			this._win.once('ready-to-show', () => {
+				const [w, h] = this._win.getSize();
+				this._win.setSize(w + 1, h, false);   // emits real WM_SIZE/NSWindowDidResize
+				this._win.setSize(w, h, false);   // back to original size
+			});
+			/* ────────────────────────────────────────────────────────────────────── */
+
 			this._lastFocusTime = Date.now(); // since we show directly, we need to set the last focus time too
 		}
 		//#endregion
