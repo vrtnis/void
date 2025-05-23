@@ -1,4 +1,5 @@
-name: Windows ARM64 Build (Fast, No Minification)
+# .github/workflows/windows-arm64-exe.yml
+name: Windows ARM64 Build (Fast EXE)
 
 on:
   workflow_dispatch:
@@ -6,36 +7,40 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh   # use PowerShell everywhere
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.18.1
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.18.1
 
-      - name: Install dependencies
-        run: npm ci
+    - name: Install dependencies
+      run: npm ci
 
-      - name: Build React
-        run: npm run buildreact
+    - name: Build React
+      run: npm run buildreact
 
-      - name: Compile source
-        run: npm run compile
+    - name: Compile source
+      run: npm run compile
 
-      - name: Run gulp for Windows ARM64
-        run: npm run gulp vscode-win32-arm64
+    # 🔑 fast packaging target that creates ../VSCode-win32-arm64/Code.exe
+    - name: Package for Windows ARM64
+      run: npm run gulp vscode-win32-arm64-build-quick
 
-      - name: Zip .build/ output
-        run: |
-          powershell -Command "Compress-Archive -Path .build\* -DestinationPath void-win32-arm64.zip"
+    - name: Zip packaged folder
+      run: |
+        Compress-Archive -Path ../VSCode-win32-arm64/* -DestinationPath void-win32-arm64.zip
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: void-win32-arm64
-          path: |
-            .build/
-            void-win32-arm64.zip
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: void-win32-arm64
+        path: |
+          ../VSCode-win32-arm64/
+          void-win32-arm64.zip
