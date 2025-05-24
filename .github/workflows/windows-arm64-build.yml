@@ -1,18 +1,24 @@
 # .github/workflows/windows-arm64-exe.yml
-name: Windows ARM64 EXE Build
+name: Windows ARM64 EXE
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-    defaults: { run: { shell: pwsh } }
+    defaults:
+      run:
+        shell: pwsh      # every `run:` uses PowerShell
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-    - uses: actions/setup-node@v4
-      with: { node-version: 20.18.1 }
+    - name: Setup Node 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.18.1
 
     - name: Install dependencies
       run: npm ci
@@ -20,16 +26,17 @@ jobs:
     - name: Build React
       run: npm run buildreact
 
-    - name: Compile source
+    - name: Compile TypeScript
       run: npm run compile
 
-    # ► THIS is the packaging step that creates Code.exe
-    - name: Package for Windows ARM64
-      run: npm run gulp vscode-win32-arm64-build
+    # 📦 builds + copies into ../VSCode-win32-arm64/Code.exe
+    - name: Package (creates Code.exe)
+      run: npm run gulp vscode-win32-arm64
 
     - name: Zip packaged folder
       run: |
-        Compress-Archive -Path ../VSCode-win32-arm64/* -DestinationPath void-win32-arm64.zip
+        Compress-Archive -Path ../VSCode-win32-arm64/* `
+                         -DestinationPath void-win32-arm64.zip
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
