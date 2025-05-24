@@ -46,6 +46,7 @@ import { IInstantiationService } from '../../instantiation/common/instantiation.
 import { VSBuffer } from '../../../base/common/buffer.js';
 import { errorHandler } from '../../../base/common/errors.js';
 
+
 export interface IWindowCreationOptions {
 	readonly state: IWindowState;
 	readonly extensionDevelopmentPath?: string[];
@@ -585,9 +586,14 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				additionalArguments: [`--vscode-window-config=${this.configObjectUrl.resource.toString()}`],
 				v8CacheOptions: this.environmentMainService.useCodeCache ? 'bypassHeatCheck' : 'none',
 			});
-			// ─── add the tint/transparent keys at the top level ───
-			options.transparent = true;          // first frame invisible
-			options.backgroundColor = '#00000000';   // fully transparent
+			// theme-aware first-frame tint
+			const scheme = this.themeMainService.getColorScheme();   // ⇢ IColorScheme
+
+			// "light" means: not dark  &&  not high-contrast
+			if (!scheme.dark && !scheme.highContrast) {
+				// one-step-off white prevents the blank-white freeze
+				options.backgroundColor = '#FFFFFE';
+			}
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new electron.BrowserWindow(options);
@@ -598,14 +604,6 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 			// Restore size/position
 			this.applyState(this.windowState, hasMultipleDisplays);
-
-			this._win.once('ready-to-show', () => {
-				this._win.setBackgroundColor('#FFFFFF');   // now safe
-				if (!this._win.isVisible()) {
-					this._win.show();
-				}
-			});
-
 			this._lastFocusTime = Date.now();   // bookkeeping
 
 		}
