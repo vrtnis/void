@@ -604,24 +604,23 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			});
 			/* ────────────────────────────────────────────────────────────────────── */
 
-			/* ────────────── compositor-unblock on first frame ────────────── */
-			this._win.once('ready-to-show', () => {
+			/* ───────────── replicate a real user resize ───────────── */
+			this._win.once('show', () => {
 
-				// If the window is maximized, a 1-px jiggle is ignored, so
-				// replicate the user’s manual restore → maximize cycle.
+				// Grab current outer bounds
+				const { x, y, width, height } = this._win.getBounds();
+
 				if (this._win.isMaximized()) {
-					this._win.unmaximize();   // native WM_SIZE / NSWindowDidResize
-					this._win.maximize();     // second native resize, back to max
+					// Max-start path:  restore ↔ re-maximize (exactly what you click)
+					this._win.unmaximize();                 // native resize #1
+					this._win.maximize();                   // native resize #2
 				} else {
-					// Non-maximized start: 1-px jiggle is sufficient
-					const [w, h] = this._win.getSize();
-					this._win.setSize(w + 1, h, false);
-					this._win.setSize(w, h, false);
+					// Restored start:  nudge right edge by +10 px, then back
+					this._win.setBounds({ x, y, width: width + 10, height }, false);
+					this._win.setBounds({ x, y, width, height }, false);
 				}
-
-				this._win.show();            // now reveal the window (no flicker)
 			});
-			/* ──────────────────────────────────────────────────────────────── */
+			/* ───────────────────────────────────────────────────────── */
 
 			this._lastFocusTime = Date.now();   // bookkeeping
 
