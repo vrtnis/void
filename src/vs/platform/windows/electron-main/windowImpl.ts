@@ -585,7 +585,9 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				additionalArguments: [`--vscode-window-config=${this.configObjectUrl.resource.toString()}`],
 				v8CacheOptions: this.environmentMainService.useCodeCache ? 'bypassHeatCheck' : 'none',
 			});
-
+			// ─── add the tint/transparent keys at the top level ───
+			options.transparent = true;          // first frame invisible
+			options.backgroundColor = '#00000000';   // fully transparent
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new electron.BrowserWindow(options);
@@ -604,23 +606,12 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			});
 			/* ────────────────────────────────────────────────────────────────────── */
 
-			/* ───────────── replicate a real user resize ───────────── */
-			this._win.once('show', () => {
-
-				// Grab current outer bounds
-				const { x, y, width, height } = this._win.getBounds();
-
-				if (this._win.isMaximized()) {
-					// Max-start path:  restore ↔ re-maximize (exactly what you click)
-					this._win.unmaximize();                 // native resize #1
-					this._win.maximize();                   // native resize #2
-				} else {
-					// Restored start:  nudge right edge by +10 px, then back
-					this._win.setBounds({ x, y, width: width + 10, height }, false);
-					this._win.setBounds({ x, y, width, height }, false);
+			this._win.once('ready-to-show', () => {
+				this._win.setBackgroundColor('#FFFFFF');   // now safe
+				if (!this._win.isVisible()) {
+					this._win.show();
 				}
 			});
-			/* ───────────────────────────────────────────────────────── */
 
 			this._lastFocusTime = Date.now();   // bookkeeping
 
