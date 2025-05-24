@@ -586,14 +586,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				additionalArguments: [`--vscode-window-config=${this.configObjectUrl.resource.toString()}`],
 				v8CacheOptions: this.environmentMainService.useCodeCache ? 'bypassHeatCheck' : 'none',
 			});
-			// theme-aware first-frame tint
-			const scheme = this.themeMainService.getColorScheme();   // ⇢ IColorScheme
 
-			// "light" means: not dark  &&  not high-contrast
-			if (!scheme.dark && !scheme.highContrast) {
-				// one-step-off white prevents the blank-white freeze
-				options.backgroundColor = '#FFFFFE';
-			}
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new electron.BrowserWindow(options);
@@ -604,6 +597,29 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 			// Restore size/position
 			this.applyState(this.windowState, hasMultipleDisplays);
+			/* ───────────── replicate a real user resize ───────────── */
+			this._win.once('ready-to-show', () => {
+
+				/* 1 ── ±10-px jiggle guarantees a physical resize */
+				const { x, y, width, height } = this._win.getBounds();
+				this._win.setBounds({ x, y, width: width + 10, height: height + 10 }, false);
+				this._win.setBounds({ x, y, width, height }, false);
+
+				/* 2 ── full maximize ↔ restore cycle to cover maximized starts */
+				if (this._win.isMaximized()) {
+					this._win.unmaximize();    // native resize #3
+					this._win.maximize();      // native resize #4
+				} else {
+					this._win.maximize();      // native resize #3
+					this._win.unmaximize();    // native resize #4
+				}
+
+				/* finally reveal the window (no flicker if already visible) */
+				if (!this._win.isVisible()) {
+					this._win.show();
+				}
+			});
+			/* ───────────────────────────────────────────────────────── */
 			this._lastFocusTime = Date.now();   // bookkeeping
 
 		}
