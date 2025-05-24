@@ -594,18 +594,30 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this._id = this._win.id;
 			this.setWin(this._win, options);
 
-			// Apply some state after window creation
+			// Restore size/position
 			this.applyState(this.windowState, hasMultipleDisplays);
 
-			/* ─────────────  native 1-px resize to unblock compositor  ───────────── */
+			/* ────────────── compositor-unblock on first frame ────────────── */
 			this._win.once('ready-to-show', () => {
-				const [w, h] = this._win.getSize();
-				this._win.setSize(w + 1, h, false);   // emits real WM_SIZE/NSWindowDidResize
-				this._win.setSize(w, h, false);   // back to original size
-			});
-			/* ────────────────────────────────────────────────────────────────────── */
 
-			this._lastFocusTime = Date.now(); // since we show directly, we need to set the last focus time too
+				// If the window is maximized, a 1-px jiggle is ignored, so
+				// replicate the user’s manual restore → maximize cycle.
+				if (this._win.isMaximized()) {
+					this._win.unmaximize();   // native WM_SIZE / NSWindowDidResize
+					this._win.maximize();     // second native resize, back to max
+				} else {
+					// Non-maximized start: 1-px jiggle is sufficient
+					const [w, h] = this._win.getSize();
+					this._win.setSize(w + 1, h, false);
+					this._win.setSize(w, h, false);
+				}
+
+				this._win.show();            // now reveal the window (no flicker)
+			});
+			/* ──────────────────────────────────────────────────────────────── */
+
+			this._lastFocusTime = Date.now();   // bookkeeping
+
 		}
 		//#endregion
 
