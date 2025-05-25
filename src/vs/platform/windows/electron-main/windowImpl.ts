@@ -597,29 +597,58 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 			// Restore size/position
 			this.applyState(this.windowState, hasMultipleDisplays);
-			/* ───────────── replicate a real user resize ───────────── */
+			/* ─────────────────  “39959” work-around combo  ───────────────── */
 			this._win.once('ready-to-show', () => {
 
-				/* 1 ── ±10-px jiggle guarantees a physical resize */
-				const { x, y, width, height } = this._win.getBounds();
-				this._win.setBounds({ x, y, width: width + 10, height: height + 10 }, false);
-				this._win.setBounds({ x, y, width, height }, false);
+				// 1 · small jiggle – forces an **actual** WM_SIZE / NSWindowDidResize
+				const b = this._win.getBounds();
+				this._win.setBounds({ ...b, width: b.width + 1 }, false);
+				this._win.setBounds(b, false);
 
-				/* 2 ── full maximize ↔ restore cycle to cover maximized starts */
+				// 2 · full maximize ↔ restore (covers windows that start maximized)
 				if (this._win.isMaximized()) {
-					this._win.unmaximize();    // native resize #3
-					this._win.maximize();      // native resize #4
+					this._win.unmaximize();
+					this._win.maximize();
 				} else {
-					this._win.maximize();      // native resize #3
-					this._win.unmaximize();    // native resize #4
+					this._win.maximize();
+					this._win.unmaximize();
 				}
 
-				/* finally reveal the window (no flicker if already visible) */
+				// 3 · minimize ↔ restore (what the GitHub comment suggested)
+				this._win.minimize();
+				setTimeout(() => this._win.restore(), 40);
+
+				// finally show (if not already visible)
 				if (!this._win.isVisible()) {
 					this._win.show();
 				}
 			});
-			/* ───────────────────────────────────────────────────────── */
+
+			// --- blur ---
+			this._win.on('blur', () => {
+				const [w, h] = this._win.getSize();
+				const canResize = this._win.isResizable();
+				if (!canResize) this._win.setResizable(true);
+
+				this._win.setSize(w, h + 1);
+				this._win.setSize(w, h);
+
+				if (!canResize) this._win.setResizable(false);
+			});
+
+			// --- focus ---
+			this._win.on('focus', () => {
+				const [w, h] = this._win.getSize();
+				const canResize = this._win.isResizable();
+				if (!canResize) this._win.setResizable(true);
+
+				this._win.setSize(w, h + 1);
+				this._win.setSize(w, h);
+
+				if (!canResize) this._win.setResizable(false);
+			});
+
+			/* ─────────────────────────────────────────────────────────────── */
 			this._lastFocusTime = Date.now();   // bookkeeping
 
 		}
