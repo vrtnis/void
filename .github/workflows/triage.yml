@@ -3,7 +3,7 @@ name: Issue Triage to Wiki
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/5 * * * *'   # every 5 minutes
 
 jobs:
   roadmap:
@@ -23,6 +23,22 @@ jobs:
         run: |
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki
 
+      # 🔍 DEBUG — show where the runner thinks files are
+      - name: Show repo tree (first 100 lines)
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Top-level files/folders:"
+          ls -al
+          echo
+          echo ".github/scripts contents (if any):"
+          ls -al .github/scripts || true
+          echo
+          echo "void/.github/scripts contents (if any):"
+          ls -al void/.github/scripts || true
+          echo
+          echo "Full tree (truncated to 100 lines):"
+          ls -R | head -n 100
+
       - name: Generate roadmap directly into wiki
         run: |
           python void/.github/scripts/issue_triage.py > wiki/issuewiki.md
@@ -34,4 +50,4 @@ jobs:
           git push
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
