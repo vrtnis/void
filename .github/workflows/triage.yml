@@ -3,45 +3,45 @@ name: Issue Triage to Wiki
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'   # every 5 minutes
+    - cron: '*/15 * * * *'   # every 15 minutes (UTC)
 
 jobs:
   roadmap:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Check out your fork’s code (so the script is present)
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
+      # 3️⃣ Install dependencies
       - name: Install Python dependencies
         run: |
           pip install openai requests
 
+      # 4️⃣ Clone your fork’s Wiki
       - name: Clone your fork's Wiki
         run: |
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki
 
-      # 🔍 DEBUG — show where the runner thinks files are
-      - name: Show repo tree (first 100 lines)
+      # 5️⃣ (Optional) Show repo tree for debugging
+      - name: Show repo tree (debug)
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Top-level files/folders:"
+          echo "PWD: $(pwd)"
           ls -al
-          echo
-          echo ".github/scripts contents (if any):"
           ls -al .github/scripts || true
-          echo
-          echo "void/.github/scripts contents (if any):"
           ls -al void/.github/scripts || true
-          echo
-          echo "Full tree (truncated to 100 lines):"
-          ls -R | head -n 100
 
+      # 6️⃣ Generate roadmap and push to the Wiki
       - name: Generate roadmap directly into wiki
         run: |
-          python void/.github/scripts/issue_triage.py > wiki/issuewiki.md
+          python .github/scripts/issue_triage.py > wiki/issuewiki.md
           cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -51,3 +51,4 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
+
