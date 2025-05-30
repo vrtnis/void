@@ -25,7 +25,7 @@ jobs:
 
       - name: Generate roadmap directly into wiki
         run: |
-          python .github/scripts/issue_triage.py > wiki/issuewiki.md
+          python void/.github/scripts/issue_triage.py > wiki/issuewiki.md
           cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
