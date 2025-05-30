@@ -3,7 +3,7 @@ name: Issue Triage to Wiki
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes (UTC)
+    - cron: '0 * * * *'   # every hour
 
 jobs:
   roadmap:
