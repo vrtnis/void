@@ -90,9 +90,9 @@ Classify these issues:
 """)
 
 resp = client.chat.completions.create(
-    model="gpt-4.1",
+    model="gpt-4.1-mini",
     messages=[{"role": "user", "content": prompt}],
-    temperature=1,
+    temperature=0.2,
 )
 
 md = resp.choices[0].message.content
