@@ -127,22 +127,38 @@ order = [
 ]
 
 sections: dict[str, list[int]] = {t: [] for t in order}
-for num, theme in cache.items():
-    sections[theme].append(num)
 
-# one GitHub request per 100 issues to map titles/URLs
+# ── fetch ALL current open issues once  (PRs filtered out) ────────────────
 title_map: dict[int, tuple[str, str]] = {}
-for pg in range(1, 15):
-    batch = fetch_open_issues(since_iso=None) if pg == 1 else []
+open_now: set[int] = set()
+
+page = 1
+while True:
+    batch = fetch_open_issues(since_iso=None) if page == 1 else []
     if not batch:
         break
     for it in batch:
-        title_map[it["number"]] = (it["title"], it["html_url"])
+        num = it["number"]
+        title_map[num] = (it["title"], it["html_url"])
+        open_now.add(num)
+    page += 1
 
+# 🧹 drop any cached IDs that are no longer open issues (e.g., became a PR or were closed)
+for stale in set(cache) - open_now:
+    del cache[stale]
+save_cache(cache)            # persist cleaned cache
+
+# build sections from cleaned cache
+for num, theme in cache.items():
+    if theme in sections:          # extra safety
+        sections[theme].append(num)
+
+# ---------------------------------------------------------------- print roadmap
 for theme in order:
-    if sections[theme]:
+    issues = sections[theme]
+    if issues:
         print(f"## {theme}")
-        for n in sorted(sections[theme]):
-            ttl, url = title_map.get(n, ("(missing)", f"https://github.com/{REPO}/issues/{n}"))
-            print(f"- [#{n}]({url}) – {ttl}")
+        for n in sorted(issues):
+            title, url = title_map.get(n, ("(missing)", f"https://github.com/{REPO}/issues/{n}"))
+            print(f"- [#{n}]({url}) – {title}")
         print()
