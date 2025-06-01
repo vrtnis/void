@@ -2,37 +2,37 @@ name: Issue Triage to Wiki
 
 on:
   workflow_dispatch:
-  #schedule:
-  #  - cron: '0 * * * *'   # every hour
+  # schedule:
+  #   - cron: '0 * * * *'   # every hour (UTC)
 
 jobs:
   roadmap:
     runs-on: ubuntu-latest
 
     steps:
-      # Check out code (so the script is present)
+      # 1️⃣ Check out code (so the script and cache files are present)
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 1 # only latest snapshot
+          fetch-depth: 1    # shallow clone
 
-      # Set up Python
+      # 2️⃣ Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # Install dependencies
+      # 3️⃣ Install dependencies
       - name: Install Python dependencies
         run: |
           pip install openai requests
 
-      # Clone your fork’s Wiki
+      # 4️⃣ Clone your fork’s Wiki
       - name: Clone your fork's Wiki
         run: |
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki
 
-      # (Optional) Show repo tree for debugging
+      # 5️⃣ (Optional) Show repo tree for debugging
       - name: Show repo tree (debug)
         run: |
           echo "PWD: $(pwd)"
@@ -40,17 +40,21 @@ jobs:
           ls -al .github/scripts || true
           ls -al void/.github/scripts || true
 
-      # Generate roadmap and push to the Wiki
+      # 6️⃣ Generate roadmap and push only if it changed
       - name: Generate roadmap directly into wiki
         run: |
-          python .github/scripts/issue_triage.py > wiki/issuewiki.md
-          cd wiki
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add issuewiki.md
-          git commit -m "Auto-update issuewiki.md from GPT triage" || echo "No changes"
-          git push
+          python .github/scripts/issue_triage.py > wiki/_new.md
+          if ! cmp -s wiki/_new.md wiki/issuewiki.md ; then
+            mv wiki/_new.md wiki/issuewiki.md
+            cd wiki
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add issuewiki.md
+            git commit -m "Auto-update issuewiki.md from GPT triage"
+            git push
+          else
+            echo "No content change – skipping wiki update"
+          fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
-
