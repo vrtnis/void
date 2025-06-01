@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 from __future__ import annotations
+import os, sys, json, datetime, pathlib, textwrap, requests
 from openai import OpenAI
-import requests, os, json, datetime, textwrap, pathlib, sys
 
 REPO = "voideditor/void"
 CACHE_FILE = pathlib.Path(".github/triage_cache.json")
 STAMP_FILE = pathlib.Path(".github/last_triage.txt")
-THEMES_MD = textwrap.dedent("""
+
+THEMES_MD = textwrap.dedent("""\
 1. 🧠 LLM Integration & Provider Support
 2. 🖥 App Build & Platform Compatibility
 3. 🎯 Prompt, Token, and Cost Management
@@ -16,65 +17,64 @@ THEMES_MD = textwrap.dedent("""
 7. 🗃 Meta: Feature Comparison, Structure, and Naming
 """).strip()
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 headers = {"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}"}
 
-# ------------------------------------------------------------------ helpers
+
+# ───────── helpers ────────────────────────────────────────────────────────
 def utc_iso_now() -> str:
     return datetime.datetime.utcnow().replace(microsecond=0, tzinfo=datetime.timezone.utc).isoformat()
 
 def read_stamp() -> str:
-    if STAMP_FILE.exists():
-        return STAMP_FILE.read_text().strip()
-    return "1970-01-01T00:00:00Z"
+    return STAMP_FILE.read_text().strip() if STAMP_FILE.exists() else "1970-01-01T00:00:00Z"
 
 def save_stamp():
     STAMP_FILE.parent.mkdir(parents=True, exist_ok=True)
     STAMP_FILE.write_text(utc_iso_now())
 
 def load_cache() -> dict[int, str]:
-    if CACHE_FILE.exists():
-        return json.loads(CACHE_FILE.read_text())
-    return {}
+    return json.loads(CACHE_FILE.read_text()) if CACHE_FILE.exists() else {}
 
-def save_cache(cache: dict[int, str]):
+def save_cache(d: dict[int, str]):
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps(cache, indent=2))
+    CACHE_FILE.write_text(json.dumps(d, indent=2))
 
-def fetch_changed_issues(since_iso: str) -> list[dict]:
+def fetch_open_issues(since_iso: str | None = None) -> list[dict]:
     issues, page = [], 1
     while True:
         url = (
             f"https://api.github.com/repos/{REPO}/issues"
-            f"?state=open&since={since_iso}&per_page=100&page={page}"
+            f"?state=open&per_page=100&page={page}"
+            + (f"&since={since_iso}" if since_iso else "")
         )
         chunk = requests.get(url, headers=headers).json()
-        if not chunk or isinstance(chunk, dict) and chunk.get("message"):
+        if not chunk or (isinstance(chunk, dict) and chunk.get("message")):
             break
-        issues.extend([i for i in chunk if "pull_request" not in i])
+        issues.extend(i for i in chunk if "pull_request" not in i)
         page += 1
     return issues
 
-# ------------------------------------------------------------------ main
-last_stamp = read_stamp()
-changed = fetch_changed_issues(last_stamp)
 
-# ── Fallback if nothing has changed AND we have no cache/wiki yet ──────────
+# ───────── main ───────────────────────────────────────────────────────────
+last_stamp = read_stamp()
+changed    = fetch_open_issues(since_iso=last_stamp)
+
+# Fallback if **nothing** changed AND we have *no* existing output
 if not changed:
     cache_exists = CACHE_FILE.exists()
     wiki_exists  = pathlib.Path("wiki/issuewiki.md").exists()
     if not cache_exists or not wiki_exists:
-        print("⏩ First run or empty wiki — fetching ALL open issues.")
-        # pull all open issues (no since=)
-        changed = fetch_changed_issues("1970-01-01T00:00:00Z")
+        # first run or someone wiped the wiki → build from scratch
+        print("⏩ First run or empty wiki — fetching ALL open issues.", file=sys.stderr)
+        changed = fetch_open_issues()         # full list
     else:
-        print(f"✅ No issues updated since {last_stamp}. Nothing to classify.")
+        print(f"✅ No issues updated since {last_stamp}. Nothing to classify.", file=sys.stderr)
         save_stamp()
         sys.exit(0)
 
-# Build prompt with only changed issues
-prompt_issues = "\n".join(f"- {i['title']} ({i['html_url']})" for i in changed)
-prompt = textwrap.dedent(f"""
+# ---------------------------------------------------------------- prompt
+issue_lines = "\n".join(f"- {i['title']} ({i['html_url']})" for i in changed)
+prompt = textwrap.dedent(f"""\
 You are an AI assistant helping triage GitHub issues into exactly 7 predefined themes.
 
 Each issue must go into exactly one of the themes below:
@@ -86,38 +86,37 @@ Format your output in Markdown like:
 - [#123](https://github.com/org/repo/issues/123) – Title here
 
 Classify these issues:
-{prompt_issues}
+{issue_lines}
 """)
 
-# GPT call
 resp = client.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": prompt}],
     temperature=0.2,
 )
-md_output = resp.choices[0].message.content
 
-# Parse GPT result to map {issue_number: theme_title}
+md = resp.choices[0].message.content
+
+# ---------------------------------------------------------------- parse GPT
 new_map: dict[int, str] = {}
-current_theme = None
-for line in md_output.splitlines():
-    if line.startswith("##"):
-        current_theme = line.lstrip("# ").strip()
-    elif line.lstrip().startswith("- [#"):
+current = None
+for ln in md.splitlines():
+    if ln.startswith("##"):
+        current = ln.lstrip("# ").strip()
+    elif ln.lstrip().startswith("- [#"):
         try:
-            issue_no = int(line.split("[#")[1].split("]")[0])
-            new_map[issue_no] = current_theme
+            num = int(ln.split("[#")[1].split("]")[0])
+            new_map[num] = current
         except Exception:
-            pass  # tolerate malformed lines
+            pass  # ignore malformed lines
 
-# Merge into cache & save
 cache = load_cache()
 cache.update(new_map)
 save_cache(cache)
 save_stamp()
 
-# Regenerate full roadmap from cache
-themes_order = [
+# ---------------------------------------------------------------- rebuild wiki
+order = [
     "🧠 LLM Integration & Provider Support",
     "🖥 App Build & Platform Compatibility",
     "🎯 Prompt, Token, and Cost Management",
@@ -127,26 +126,23 @@ themes_order = [
     "🗃 Meta: Feature Comparison, Structure, and Naming",
 ]
 
-sections: dict[str, list[str]] = {t: [] for t in themes_order}
-for issue_no, theme in cache.items():
-    sections[theme].append(issue_no)
+sections: dict[str, list[int]] = {t: [] for t in order}
+for num, theme in cache.items():
+    sections[theme].append(num)
 
-# fetch titles/urls for all issues in cache (cheap: one API call per 100)
+# one GitHub request per 100 issues to map titles/URLs
 title_map: dict[int, tuple[str, str]] = {}
-for page in range(1, 10):
-    url = f"https://api.github.com/repos/{REPO}/issues?state=open&per_page=100&page={page}"
-    batch = requests.get(url, headers=headers).json()
-    if not batch or isinstance(batch, dict) and batch.get("message"):
+for pg in range(1, 15):
+    batch = fetch_open_issues(since_iso=None) if pg == 1 else []
+    if not batch:
         break
     for it in batch:
-        if "pull_request" not in it:
-            title_map[it["number"]] = (it["title"], it["html_url"])
+        title_map[it["number"]] = (it["title"], it["html_url"])
 
-# Print roadmap
-for theme in themes_order:
+for theme in order:
     if sections[theme]:
         print(f"## {theme}")
         for n in sorted(sections[theme]):
-            title, url = title_map.get(n, ("(missing)", f"https://github.com/{REPO}/issues/{n}"))
-            print(f"- [#{n}]({url}) – {title}")
+            ttl, url = title_map.get(n, ("(missing)", f"https://github.com/{REPO}/issues/{n}"))
+            print(f"- [#{n}]({url}) – {ttl}")
         print()
