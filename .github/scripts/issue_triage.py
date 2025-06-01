@@ -8,7 +8,7 @@ CACHE_FILE = pathlib.Path(".github/triage_cache.json")
 STAMP_FILE = pathlib.Path(".github/last_triage.txt")
 
 THEMES_MD = textwrap.dedent("""\
-1. 🧠 LLM Integration & Provider Support
+1. 🔗 LLM Integration & Provider Support
 2. 🖥 App Build & Platform Compatibility
 3. 🎯 Prompt, Token, and Cost Management
 4. 🧩 Editor UX & Interaction Design
@@ -62,7 +62,7 @@ changed    = fetch_open_issues(since_iso=last_stamp)
 # Fallback if **nothing** changed AND we have *no* existing output
 if not changed:
     cache_exists = CACHE_FILE.exists()
-    wiki_exists  = pathlib.Path("wiki/issuewiki.md").exists()
+    wiki_exists  = pathlib.Path("wiki/Issue-Categories.md").exists()
     if not cache_exists or not wiki_exists:
         # first run or someone wiped the wiki → build from scratch
         print("⏩ First run or empty wiki — fetching ALL open issues.", file=sys.stderr)
@@ -90,7 +90,7 @@ Classify these issues:
 """)
 
 resp = client.chat.completions.create(
-    model="gpt-4.1-mini",
+    model="gpt-4.1",
     messages=[{"role": "user", "content": prompt}],
     temperature=1,
 )
@@ -117,7 +117,7 @@ save_stamp()
 
 # ---------------------------------------------------------------- rebuild wiki
 order = [
-    "🧠 LLM Integration & Provider Support",
+    "🔗 LLM Integration & Provider Support",
     "🖥 App Build & Platform Compatibility",
     "🎯 Prompt, Token, and Cost Management",
     "🧩 Editor UX & Interaction Design",
