@@ -59,10 +59,18 @@ def fetch_changed_issues(since_iso: str) -> list[dict]:
 last_stamp = read_stamp()
 changed = fetch_changed_issues(last_stamp)
 
+# ── Fallback if nothing has changed AND we have no cache/wiki yet ──────────
 if not changed:
-    print(f"✅ No issues updated since {last_stamp}. Nothing to classify.")
-    save_stamp()
-    sys.exit(0)
+    cache_exists = CACHE_FILE.exists()
+    wiki_exists  = pathlib.Path("wiki/issuewiki.md").exists()
+    if not cache_exists or not wiki_exists:
+        print("⏩ First run or empty wiki — fetching ALL open issues.")
+        # pull all open issues (no since=)
+        changed = fetch_changed_issues("1970-01-01T00:00:00Z")
+    else:
+        print(f"✅ No issues updated since {last_stamp}. Nothing to classify.")
+        save_stamp()
+        sys.exit(0)
 
 # Build prompt with only changed issues
 prompt_issues = "\n".join(f"- {i['title']} ({i['html_url']})" for i in changed)
